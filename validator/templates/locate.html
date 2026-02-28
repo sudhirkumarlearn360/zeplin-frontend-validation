@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">📍 Defect Location — {{ defect.element }}</h4>
+    <a href="{% url 'validator:report' pk=report.id %}" class="btn btn-outline-secondary btn-sm no-print">← Back to Report #{{ report.id }}</a>
+</div>
+
+<div class="card border-{{ severity_color }} shadow-sm mb-4">
+    <div class="card-header bg-{{ severity_color }} {% if severity_color != 'warning' %}text-white{% else %}text-dark{% endif %} fw-bold d-flex justify-content-between">
+        <span>{{ defect.property }} — {{ defect.element }}</span>
+        <span class="badge bg-light text-dark">{{ defect.severity|upper }}</span>
+    </div>
+    <div class="card-body">
+        {% if defect.description %}
+        <p class="text-secondary mb-2"><strong>Problem:</strong> {{ defect.description }}</p>
+        {% endif %}
+        <div class="row" style="font-size: 0.9rem;">
+            <div class="col-md-3"><strong>Property:</strong> <code>{{ defect.property }}</code></div>
+            <div class="col-md-3"><strong>Expected:</strong> <span class="text-success fw-bold">{{ defect.expected }}</span></div>
+            <div class="col-md-3"><strong>Actual:</strong> <span class="text-danger fw-bold">{{ defect.actual }}</span></div>
+            <div class="col-md-3"><strong>Selector:</strong> <code>{{ defect.selector }}</code></div>
+        </div>
+        {% if defect.css_fix %}
+        <div class="mt-3">
+            <strong>✅ Suggested Fix:</strong>
+            <pre class="bg-dark text-success p-2 rounded mt-1 mb-0" style="font-size: 0.85rem; white-space: pre-wrap;"><code>{{ defect.css_fix }}</code></pre>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+        <span>🖼️ Live Page Screenshot — Element Highlighted</span>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-sm btn-outline-light" onclick="setAllCardsState('show')">Show Info</button>
+            <button type="button" class="btn btn-sm btn-outline-light" onclick="setAllCardsState('hide')">Hide Info</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="setAllCardsState('complete_hide')">Complete Hide</button>
+        </div>
+    </div>
+    <div class="card-body p-2 text-center" style="overflow: auto; max-height: 80vh; background: #f0f0f0;">
+        <div style="position: relative; display: inline-block;">
+            {% if report.live_image %}
+            <img src="{{ report.live_image.url }}" alt="Live Page" style="display: block; max-width: none;">
+            <!-- Red highlight box at exact location -->
+            <div id="highlight-box" style="
+                position: absolute;
+                top: {{ defect_y }}px;
+                left: {{ defect_x }}px;
+                width: {{ defect_w }}px;
+                height: {{ defect_h }}px;
+                border: 4px solid red;
+                background: rgba(255, 0, 0, 0.15);
+                box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+                z-index: 10;
+            ">
+                <span class="badge bg-{% if defect.severity == 'critical' %}danger{% elif defect.severity == 'high' %}warning{% else %}primary{% endif %}" 
+                      style="position: absolute; top: -12px; left: -2px; font-size: 10px; padding: 2px 4px; border: 1px solid white; pointer-events: auto; cursor: pointer;"
+                      data-bs-toggle="popover" 
+                      data-bs-trigger="hover focus" 
+                      data-bs-placement="top" 
+                      data-bs-html="true"
+                      title="<span class='badge bg-{% if defect.severity == 'critical' %}danger{% elif defect.severity == 'high' %}warning{% else %}primary{% endif %}'>#{{ defect.idx|add:1 }}</span> {{ defect.property }} - {{ defect.element }}"
+                      data-bs-content="
+                          <div class='small'>
+                              <p class='mb-2'><strong>Problem:</strong> {{ defect.problem_description }}</p>
+                              <p class='mb-1 text-muted'><strong>Selector:</strong> <br><code>{{ defect.selector }}</code></p>
+                              <div class='d-flex justify-content-between mt-2 pt-2 border-top'>
+                                  <div>
+                                      <span class='d-block text-muted text-uppercase fw-bold' style='font-size: 0.7rem;'>Expected</span>
+                                      <span class='fw-bold text-success'>{{ defect.expected_value }}</span>
+                                  </div>
+                                  <div class='text-end'>
+                                      <span class='d-block text-muted text-uppercase fw-bold' style='font-size: 0.7rem;'>Actual</span>
+                                      <span class='fw-bold text-danger'>{{ defect.actual_value }}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      ">#{{ defect.idx|add:1 }}</span>
+            </div>
+            <!-- Full Details Floating Card -->
+            <div class="shadow defect-card draggable-card" id="card-solo" style="
+                position: absolute;
+                top: {{ label_y }}px;
+                left: {{ defect_x }}px;
+                background: white;
+                color: #333;
+                font-size: 11px;
+                padding: 10px;
+                border: 3px solid var(--bs-{{ severity_color }});
+                border-radius: 6px;
+                z-index: 11;
+                width: max-content;
+                max-width: 350px;
+                text-align: left;
+                line-height: 1.4;
+            ">
+                <!-- Card Header -->
+                <div class="d-flex justify-content-between align-items-center mb-1 pb-1 border-bottom drag-handle" style="cursor: move;">
+                    <div class="fw-bold" style="font-size: 13px; color: var(--bs-{{ severity_color }});">
+                        {{ defect.property }}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 ms-2 text-secondary toggle-btn" onclick="toggleDefectCard(this, 'defect-details-solo');" title="Minimize/Maximize">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                
+                <!-- Collapsible Card Body -->
+                <div id="defect-details-solo">
+                    <div class="mb-1 text-dark fw-bold">Severity: {{ defect.severity|title }}</div>
+                <div class="mb-1 fw-bold text-secondary text-truncate" style="max-width: 330px;" title="{{ defect.element }}">{{ defect.element }}</div>
+                <div class="mb-1 text-muted"><strong>Selector:</strong> <code class="text-dark">{{ defect.selector }}</code></div>
+                
+                <div class="d-flex justify-content-between my-2 p-2 bg-light border rounded">
+                    <div>
+                        <span class="d-block text-muted fw-bold" style="font-size: 10px; text-transform: uppercase;">Expected (Zeplin)</span>
+                        <span class="fw-bold text-success">{{ defect.expected }}</span>
+                    </div>
+                    <div class="text-end ms-4">
+                        <span class="d-block text-muted fw-bold" style="font-size: 10px; text-transform: uppercase;">Actual (Live)</span>
+                        <span class="fw-bold text-danger">{{ defect.actual }}</span>
+                    </div>
+                </div>
+                
+                <div class="text-muted mb-2 pb-2 border-bottom" style="white-space: normal;">
+                    <strong>Problem:</strong> {{ defect.description }}
+                </div>
+                
+                {% if defect.css_fix %}
+                <div class="text-success fw-bold" style="font-size: 10px;">✅ Suggested CSS Fix:</div>
+                <pre class="bg-dark text-success p-2 rounded mt-1 mb-0" style="font-size: 10px; white-space: pre-wrap;"><code>{{ defect.css_fix }}</code></pre>
+                {% endif %}
+                </div> <!-- End Collapsible Body -->
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="text-center mb-4 text-muted small">
+    <strong>Page:</strong> <a href="{{ report.live_url }}" target="_blank">{{ report.live_url }}</a> |
+    <strong>Coordinates:</strong> ({{ defect_x }}, {{ defect_y }}) |
+    <strong>Element size:</strong> {{ defect_w }}x{{ defect_h }}px
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- JavaScript for Auto-scroll and Toggle -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const box = document.getElementById('highlight-box');
+    if (box) {
+        box.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }
+});
+
+// Handle the 3 global visibility states
+function setAllCardsState(state) {
+    const cards = document.querySelectorAll('.draggable-card');
+    const container = document.getElementById('defect-details-solo');
+    const icons = document.querySelectorAll('.toggle-icon');
+    
+    if (state === 'show') {
+        cards.forEach(c => c.style.display = 'block');
+        if (container) container.style.display = 'block';
+        icons.forEach(i => i.innerText = '▼');
+    } else if (state === 'hide') {
+        cards.forEach(c => c.style.display = 'block');
+        if (container) container.style.display = 'none';
+        icons.forEach(i => i.innerText = '▶');
+    } else if (state === 'complete_hide') {
+        cards.forEach(c => c.style.display = 'none');
+    }
+}
+
+function toggleDefectCard(btn, targetId) {
+    var detailsContainer = document.getElementById(targetId);
+    var icon = btn.querySelector('.toggle-icon');
+    
+    if (detailsContainer.style.display === 'none') {
+        detailsContainer.style.display = 'block';
+        icon.innerText = '▼';
+    } else {
+        detailsContainer.style.display = 'none';
+        icon.innerText = '▶';
+    }
+}
+
+// Draggable functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.draggable-card');
+    
+    cards.forEach(card => {
+        const handle = card.querySelector('.drag-handle');
+        if (!handle) return;
+        
+        let isDragging = false;
+        let hasDragged = false;
+        let startX, startY, initialX, initialY;
+
+        handle.addEventListener('mousedown', function(e) {
+            if (e.target.closest('.toggle-btn')) return;
+            
+            isDragging = true;
+            hasDragged = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            // Get current computed position
+            const style = window.getComputedStyle(card);
+            initialX = parseFloat(style.left) || 0;
+            initialY = parseFloat(style.top) || 0;
+            
+            // Bring to front
+            card.style.zIndex = '1000';
+            
+            e.preventDefault(); // Prevent text selection
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            
+            // If moved more than 2 pixels, it's a drag
+            if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                hasDragged = true;
+            }
+            
+            card.style.left = (initialX + dx) + 'px';
+            card.style.top = (initialY + dy) + 'px';
+            card.style.zIndex = '12'; // Set z-index during drag
+            
+            e.preventDefault();
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                setTimeout(() => { hasDragged = false; }, 50);
+            }
+        });
+        
+        // Smart click prevention: Only stop propagation if dragging occurred or toggling
+        card.addEventListener('click', function(e) {
+            if (hasDragged || e.target.closest('.toggle-btn')) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        });
+    });
+    
+    // Initialize Bootstrap popovers for the number badges
+    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+    var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl)
+    });
+});
+</script>
+
+{% endblock %}

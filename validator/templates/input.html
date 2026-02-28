@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">🔍 Run New Validation</h4>
+                <a href="{% url 'validator:list' %}" class="btn btn-sm btn-light text-primary fw-bold">View All History →</a>
+            </div>
+            <div class="card-body p-4">
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+                
+                <form id="validationForm" method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <button type="submit" class="btn btn-primary w-100 py-3 mt-4 fw-bold fs-5">🚀 Run Validation</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center mt-5 mb-5">
+    <div class="col-md-10">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0">🕒 Recent Scan History</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 5%">#</th>
+                                <th style="width: 15%">Date & Time</th>
+                                <th style="width: 30%">Live URL</th>
+                                <th style="width: 15%">Project ID</th>
+                                <th style="width: 15%">Screen ID</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for scan in recent_scans %}
+                            <tr>
+                                <td class="fw-bold fs-6">{{ scan.id }}</td>
+                                <td class="text-nowrap fs-6">{{ scan.created_at|date:"M d, Y H:i" }}</td>
+                                <td>
+                                    <a href="{{ scan.live_url }}" target="_blank" title="{{ scan.live_url }}" class="text-truncate d-inline-block text-decoration-none fs-6" style="max-width: 300px;">
+                                        🌐 {{ scan.live_url|truncatechars:55 }}
+                                    </a>
+                                </td>
+                                <td><code class="text-dark bg-light px-2 py-1 rounded fs-6">{{ scan.zeplin_project_id }}</code></td>
+                                <td><code class="text-dark bg-light px-2 py-1 rounded fs-6">{{ scan.zeplin_screen_id }}</code></td>
+                                <td>
+                                    {% if scan.status == 'PASS' %}
+                                        <span class="badge bg-success px-2 py-1 fs-6">PASS</span>
+                                    {% else %}
+                                        <span class="badge bg-danger px-2 py-1 fs-6">FAIL</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'validator:report' pk=scan.id %}" class="btn btn-sm btn-outline-primary fs-6 px-3 view-btn">📊 View Report</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">No validation history found yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="loader-overlay" id="loader">
+    <div class="spinner-border text-primary" role="status" style="width: 4rem; height: 4rem;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <h3 class="mt-4 fw-bold">Validating Design...</h3>
+    <p class="text-secondary fs-5" id="loader-msg">Fetching from Zeplin APIs...</p>
+    <div class="progress w-50 mt-3" style="height: 20px;">
+        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="loader-progress" role="progressbar" style="width: 15%"></div>
+    </div>
+    <p class="mt-3 fw-bold text-success fs-6">⏱️ Estimated time: ~15 seconds</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('validationForm').addEventListener('submit', function(e) {
+        // Show loader
+        document.getElementById('loader').style.display = 'flex';
+        
+        let msg = document.getElementById('loader-msg');
+        let bar = document.getElementById('loader-progress');
+        
+        // Simple artificial progress bar increments
+        setTimeout(() => { msg.innerText = "Capturing Playwright Screenshot..."; bar.style.width = "40%"; }, 3500);
+        setTimeout(() => { msg.innerText = "Performing PixelMatch Image Comparison..."; bar.style.width = "75%"; }, 8000);
+        setTimeout(() => { msg.innerText = "Validating Computed CSS against Zeplin Specs..."; bar.style.width = "90%"; }, 12000);
+    });
+</script>
+{% endblock %}

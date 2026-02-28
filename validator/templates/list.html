@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 mt-5">
+    <h2>Validation History</h2>
+    <a href="{% url 'validator:input' %}" class="btn btn-primary fw-bold">New Validation</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body bg-light">
+        <form method="get" class="row g-3 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white">🔍</span>
+                    <input type="text" name="q" class="form-control" placeholder="Search Project ID, Screen ID, URL..." value="{{ request.GET.q }}">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-white">📅</span>
+                    <input type="date" name="date_filter" class="form-control" value="{{ request.GET.date_filter }}">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select name="status" class="form-select" onchange="this.form.submit()">
+                    <option value="">Status: All</option>
+                    <option value="PASS" {% if request.GET.status == 'PASS' %}selected{% endif %}>✅ PASS</option>
+                    <option value="FAIL" {% if request.GET.status == 'FAIL' %}selected{% endif %}>❌ FAIL</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100 fw-bold">Filter</button>
+                {% if request.GET.q or request.GET.status or request.GET.date_filter %}
+                <a href="{% url 'validator:list' %}" class="btn btn-outline-secondary" title="Clear Filters">✖</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow rounded-3 overflow-hidden">
+    <div class="table-responsive m-0">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col" class="ps-4">ID</th>
+                    <th scope="col">Date Executed</th>
+                    <th scope="col">Live URL</th>
+                    <th scope="col">Project ID</th>
+                    <th scope="col">Screen ID</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" class="text-center">Pixel Mismatches</th>
+                    <th scope="col" class="text-center">CSS Defects</th>
+                    <th scope="col" class="text-center">JS Errors</th>
+                    <th scope="col" class="text-center">DOM Bloat</th>
+                    <th scope="col" class="pe-4 text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports %}
+                <tr>
+                    <td class="ps-4 fw-medium text-muted fs-6">#{{ report.id }}</td>
+                    <td class="text-nowrap fs-6">{{ report.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <a href="{{ report.live_url }}" target="_blank" title="{{ report.live_url }}" class="text-truncate d-inline-block text-decoration-none fs-6" style="max-width: 250px;">
+                            🌐 {{ report.live_url|truncatechars:45 }}
+                        </a>
+                    </td>
+                    <td><span class="font-monospace fs-6">{{ report.zeplin_project_id }}</span></td>
+                    <td><span class="font-monospace fs-6">{{ report.zeplin_screen_id }}</span></td>
+                    <td>
+                        {% if report.status == 'PASS' %}
+                            <span class="badge bg-success px-2 py-1 fs-6">PASS</span>
+                        {% else %}
+                            <span class="badge bg-danger px-2 py-1 fs-6">FAIL</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center fw-bold fs-6 {% if report.pixel_mismatch_count > 5000 %}text-danger{% endif %}">{{ report.pixel_mismatch_count }}</td>
+                    <td class="text-center fw-bold fs-6 {% if report.css_mismatch_count > 0 %}text-warning{% endif %}">{{ report.css_mismatch_count }}</td>
+                    <td class="text-center fw-bold fs-6 {% if report.js_error_count > 0 %}text-danger{% endif %}">{{ report.js_error_count|default:"0" }}</td>
+                    <td class="text-center fw-medium text-nowrap fs-6">
+                        <span title="Live Elements / Zeplin Layers">{{ report.dom_node_count|default:"-" }} / {{ report.zeplin_layer_count|default:"-" }}</span>
+                    </td>
+                    <td class="pe-4 text-end">
+                        <a href="{% url 'validator:report' report.id %}" class="btn btn-sm btn-outline-primary fw-medium px-3 fs-6">View Report</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="11" class="text-center py-5 text-muted">No validation history found matching the criteria.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if is_paginated %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.date_filter %}&date_filter={{ request.GET.date_filter }}{% endif %}">Previous</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+        {% endif %}
+        
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.date_filter %}&date_filter={{ request.GET.date_filter }}{% endif %}">Next</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">🗺️ All Defect Locations — {{ defects_with_coords|length }} issues</h4>
+    <a href="{% url 'validator:report' pk=report.id %}" class="btn btn-outline-secondary btn-sm no-print">← Back to Report #{{ report.id }}</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+        <span>🖼️ Live Page Screenshot — All Elements Highlighted</span>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-sm btn-outline-light" onclick="setAllCardsState('show')">Show Info</button>
+            <button type="button" class="btn btn-sm btn-outline-light" onclick="setAllCardsState('hide')">Hide Info</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="setAllCardsState('complete_hide')">Complete Hide</button>
+        </div>
+    </div>
+    <div class="card-body p-2 text-center" style="overflow: auto; max-height: 80vh; background: #f0f0f0;">
+        <div style="position: relative; display: inline-block;">
+            {% if report.live_image %}
+            <img src="{{ report.live_image.url }}" alt="Live Page" style="display: block; max-width: none;">
+            
+            {% for defect in defects_with_coords %}
+            <!-- Red highlight box for defect #{{ defect.idx }} -->
+            <a href="{% url 'validator:locate' pk=report.id idx=defect.idx %}" 
+               class="defect-box">
+                <div style="
+                    position: absolute;
+                    top: {{ defect.y }}px;
+                    left: {{ defect.x }}px;
+                    width: {{ defect.w }}px;
+                    height: {{ defect.h }}px;
+                    border: 3px solid {% if defect.severity == 'critical' %}red{% elif defect.severity == 'high' %}orange{% else %}blue{% endif %};
+                    background: rgba({% if defect.severity == 'critical' %}255,0,0{% elif defect.severity == 'high' %}255,165,0{% else %}0,0,255{% endif %}, 0.1);
+                    z-index: 10;
+                    cursor: pointer;
+                ">
+                    <span class="badge bg-{% if defect.severity == 'critical' %}danger{% elif defect.severity == 'high' %}warning{% else %}primary{% endif %}" 
+                          style="position: absolute; top: -12px; left: -2px; font-size: 10px; padding: 2px 4px; border: 1px solid white;"
+                          data-bs-toggle="popover" 
+                          data-bs-trigger="hover focus" 
+                          data-bs-placement="top" 
+                          data-bs-html="true"
+                          title="<span class='badge bg-{% if defect.severity == 'critical' %}danger{% elif defect.severity == 'high' %}warning{% else %}primary{% endif %}'>#{{ defect.idx|add:1 }}</span> {{ defect.property }} - {{ defect.element }}"
+                          data-bs-content="
+                              <div class='small'>
+                                  <p class='mb-2'><strong>Problem:</strong> {{ defect.problem_description }}</p>
+                                  <p class='mb-1 text-muted'><strong>Selector:</strong> <br><code>{{ defect.selector }}</code></p>
+                                  <div class='d-flex justify-content-between mt-2 pt-2 border-top'>
+                                      <div>
+                                          <span class='d-block text-muted text-uppercase fw-bold' style='font-size: 0.7rem;'>Expected</span>
+                                          <span class='fw-bold text-success'>{{ defect.expected_value }}</span>
+                                      </div>
+                                      <div class='text-end'>
+                                          <span class='d-block text-muted text-uppercase fw-bold' style='font-size: 0.7rem;'>Actual</span>
+                                          <span class='fw-bold text-danger'>{{ defect.actual_value }}</span>
+                                      </div>
+                                  </div>
+                              </div>
+                          ">#{{ defect.idx|add:1 }}</span>
+                </div>
+                <!-- Permanently Visible Full Details Card -->
+                <div class="shadow-sm defect-card draggable-card" id="card-{{ defect.idx }}" style="
+                    position: absolute;
+                    top: {{ defect.label_y }}px;
+                    left: {{ defect.x }}px;
+                    background: white;
+                    color: #333;
+                    font-size: 11px;
+                    padding: 8px;
+                    border: 2px solid {% if defect.severity == 'critical' %}#dc3545{% elif defect.severity == 'high' %}#fd7e14{% else %}#0d6efd{% endif %};
+                    border-radius: 4px;
+                    z-index: 11;
+                    width: max-content;
+                    max-width: 320px;
+                    text-align: left;
+                    line-height: 1.4;
+                ">
+                    <!-- Card Header / Title Row -->
+                    <div class="d-flex justify-content-between align-items-center mb-1 pb-1 border-bottom drag-handle" style="cursor: move;">
+                        <div class="fw-bold" style="font-size: 12px; color: {% if defect.severity == 'critical' %}#dc3545{% elif defect.severity == 'high' %}#fd7e14{% else %}#0d6efd{% endif %};">
+                            <span class="badge bg-{% if defect.severity == 'critical' %}danger{% elif defect.severity == 'high' %}warning{% else %}primary{% endif %} me-1">#{{ defect.idx|add:1 }}</span>
+                            {{ defect.property }}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 ms-2 text-secondary toggle-btn" data-target="defect-details-{{ defect.idx }}" onclick="event.preventDefault(); toggleDefectCard(this, 'defect-details-{{ defect.idx }}');" title="Minimize/Maximize">
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Collapsible Card Body -->
+                    <div id="defect-details-{{ defect.idx }}" class="defect-details-container">
+                        <div class="mb-1 text-dark fw-bold">Severity: {{ defect.severity|title }}</div>
+                    <div class="mb-1 text-truncate fw-bold text-secondary" style="max-width: 300px;" title="{{ defect.element }}">{{ defect.element }}</div>
+                    <div class="mb-1 text-muted"><strong>Selector:</strong> <code>{{ defect.selector }}</code></div>
+                    
+                    <div class="d-flex justify-content-between my-2 p-1 bg-light border rounded">
+                        <div>
+                            <span class="d-block text-muted fw-bold" style="font-size: 9px; text-transform: uppercase;">Expected (Zeplin)</span>
+                            <span class="fw-bold text-success">{{ defect.expected_value }}</span>
+                        </div>
+                        <div class="text-end ms-3">
+                            <span class="d-block text-muted fw-bold" style="font-size: 9px; text-transform: uppercase;">Actual (Live)</span>
+                            <span class="fw-bold text-danger">{{ defect.actual_value }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-muted" style="white-space: normal;">
+                        <strong>Problem:</strong> {{ defect.problem_description }}
+                    </div>
+                    </div> <!-- End Collapsible Body -->
+                </div>
+            </a>
+            {% endfor %}
+            
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-footer bg-light text-muted small text-center">
+        Click on any highlighted box on the image to jump directly to its detailed view.
+    </div>
+</div>
+</div>
+
+<!-- JavaScript to handle Minimize/Maximize -->
+<script>
+// Handle the 3 global visibility states
+function setAllCardsState(state) {
+    const cards = document.querySelectorAll('.draggable-card');
+    const containers = document.querySelectorAll('.defect-details-container');
+    const icons = document.querySelectorAll('.toggle-icon');
+    
+    if (state === 'show') {
+        cards.forEach(c => c.style.display = 'block');
+        containers.forEach(c => c.style.display = 'block');
+        icons.forEach(i => i.innerText = '▼');
+    } else if (state === 'hide') {
+        cards.forEach(c => c.style.display = 'block');
+        containers.forEach(c => c.style.display = 'none');
+        icons.forEach(i => i.innerText = '▶');
+    } else if (state === 'complete_hide') {
+        cards.forEach(c => c.style.display = 'none');
+    }
+}
+
+// Single card minimize/maximize
+function toggleDefectCard(btn, targetId) {
+    var detailsContainer = document.getElementById(targetId);
+    var icon = btn.querySelector('.toggle-icon');
+    
+    if (detailsContainer.style.display === 'none') {
+        detailsContainer.style.display = 'block';
+        icon.innerText = '▼';
+    } else {
+        detailsContainer.style.display = 'none';
+        icon.innerText = '▶';
+    }
+}
+
+// Draggable functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.draggable-card');
+    
+    cards.forEach(card => {
+        const handle = card.querySelector('.drag-handle');
+        let isDragging = false;
+        let hasDragged = false;
+        let startX, startY, initialX, initialY;
+
+        handle.addEventListener('mousedown', function(e) {
+            if (e.target.closest('.toggle-btn')) return;
+            
+            isDragging = true;
+            hasDragged = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            // Get current computed position
+            const style = window.getComputedStyle(card);
+            initialX = parseFloat(style.left) || 0;
+            initialY = parseFloat(style.top) || 0;
+            
+            // Bring to front
+            cards.forEach(c => c.style.zIndex = '11');
+            card.style.zIndex = '1000';
+            
+            e.preventDefault(); // Prevent text selection
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            
+            // If moved more than 2 pixels, it's a drag
+            if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                hasDragged = true;
+            }
+            
+            card.style.left = (initialX + dx) + 'px';
+            card.style.top = (initialY + dy) + 'px';
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                // Defer reset of hasDragged so the immediate click event can see it
+                setTimeout(() => { hasDragged = false; }, 50);
+            }
+        });
+        
+        // Smart click prevention: Only stop the map navigation if dragging occurred or toggling
+        card.addEventListener('click', function(e) {
+            if (hasDragged || e.target.closest('.toggle-btn')) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        });
+    });
+    
+    // Initialize Bootstrap popovers specifically linked to our number badges
+    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+    var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl)
+    });
+});
+</script>
+
+{% endblock %}

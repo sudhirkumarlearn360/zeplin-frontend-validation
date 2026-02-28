@@ -1,0 +1,8 @@
+Django==4.2
+python-dotenv
+requests
+pillow
+pixelmatch
+playwright
+django-crispy-forms
+crispy-bootstrap5
