@@ -347,7 +347,46 @@ function downloadHTML() {
     // Since we want a self-contained look, but base64 is heavy, we'll just inject absolute base URI for local testing
     // or let it use the current domain.
     
-    const htmlContent = clone.outerHTML;
+    // Resolve relative URLs to absolute so the standalone file works locally
+    const baseUri = window.location.origin;
+    
+    // Convert img src to absolute
+    clone.querySelectorAll('img').forEach(img => {
+        if (img.src && typeof img.src === 'string' && img.src.startsWith('/')) {
+            img.src = baseUri + img.src;
+        } else {
+            // Force browser to evaluate the absolute URL of the property
+            img.src = img.src; 
+        }
+    });
+
+    // Convert link href (CSS) to absolute
+    clone.querySelectorAll('link').forEach(link => {
+        if (link.href && typeof link.href === 'string' && link.href.startsWith('/')) {
+            link.href = baseUri + link.href;
+        } else {
+            link.href = link.href;
+        }
+    });
+    
+    // Convert script src to absolute
+    clone.querySelectorAll('script').forEach(script => {
+        if (script.src && typeof script.src === 'string' && script.src.startsWith('/')) {
+            script.src = baseUri + script.src;
+        } else if (script.src) {
+            script.src = script.src;
+        }
+    });
+    
+    // Inject a base tag just in case
+    const head = clone.querySelector('head');
+    if (head) {
+        const base = document.createElement('base');
+        base.href = baseUri + '/';
+        head.insertBefore(base, head.firstChild);
+    }
+    
+    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     
@@ -355,10 +394,20 @@ function downloadHTML() {
     a.href = url;
     a.download = `Validation_Report_{{ report.id }}_${new Date().toISOString().slice(0,10)}.html`;
     document.body.appendChild(a);
-    a.click();
     
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Create and dispatch a clean click event
+    const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: false
+    });
+    a.dispatchEvent(clickEvent);
+    
+    // Cleanup
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
 }
 </script>
 {% endblock %}

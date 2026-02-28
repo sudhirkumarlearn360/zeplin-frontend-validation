@@ -23,7 +23,7 @@
             {% for defect in defects_with_coords %}
             <!-- Red highlight box for defect #{{ defect.idx }} -->
             <a href="{% url 'validator:locate' pk=report.id idx=defect.idx %}" 
-               class="defect-box">
+               class="defect-box"></a>
                 <div style="
                     position: absolute;
                     top: {{ defect.y }}px;
