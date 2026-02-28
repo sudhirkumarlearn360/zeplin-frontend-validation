@@ -16,14 +16,14 @@ RUN  apt-get update -y && \
      rm -rf /var/lib/apt/lists/*
 
 # Configure project
-WORKDIR /home/ubuntu/main/cnext-backend-deb
-COPY requirements.txt /home/ubuntu/main/cnext-backend-deb/requirements.txt
+WORKDIR /home/ubuntu/main/zeplin-frontend-validation
+COPY requirements.txt /home/ubuntu/main/zeplin-frontend-validation/requirements.txt
 RUN pip3 install -r requirements.txt
 
 # Install Playwright Chromium specifically (Zeplin Validator engine)
 RUN playwright install chromium
 
-COPY . /home/ubuntu/main/cnext-backend-deb
+COPY . /home/ubuntu/main/zeplin-frontend-validation
 
 EXPOSE 8080
 
