@@ -9,7 +9,19 @@ The validator connects to the Zeplin API, downloads the design and metadata, tak
 ## Prerequisites
 - Python 3.12 (Compatible)
 - Zeplin Personal Access Token
-- Node.js (Optional, only if using other JS playwright configs, but this project uses python playwright)
+## Visual Previews
+
+### 1. Dashboard & Recent Scans
+![Dashboard](docs/assets/1_dashboard.png)
+
+### 2. Live Geometric Validation Grid
+![Visual Report Grid](docs/assets/2_report_grid.png)
+
+### 3. Deep-Dive CSS Mismatch Details
+![Pixel Error Table](docs/assets/3_report_table.png)
+
+### 4. Interactive Drag-and-Drop Navigation Map
+![Interactive Error Map](docs/assets/4_interactive_map.png)
 
 ## Setup Instructions
 
