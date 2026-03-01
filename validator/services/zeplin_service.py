@@ -49,21 +49,75 @@ class ZeplinService:
             
         # Fallback dummy layer if Zeplin API refuses to provide layer geometry
         if not layers:
-            layers = [{
-                "type": "text",
-                "name": "Dummy Fallback Layer",
-                "content": "Zeplin API refused to return layer data for this screen.\\nDummy block inserted for code generation testing.",
-                "rect": {"x": 50, "y": 100, "width": 600, "height": 200},
-                "fills": [{"color": {"r": 255, "g": 200, "b": 200, "a": 1}}],
-                "borders": [{"color": {"r": 255, "g": 0, "b": 0, "a": 1}, "thickness": 2}],
-                "border_radius": 10,
-                "texts": [{"style": {"font_size": 24, "color": {"r": 50, "g": 0, "b": 0, "a": 1}}}]
-            }]
+            image_url = screen_data.get('image', {}).get('original_url')
+            if image_url:
+                layers = self._run_ocr_fallback(image_url)
+                
+            if not layers:
+                layers = [{
+                    "type": "text",
+                    "name": "Dummy Fallback Layer",
+                    "content": "Zeplin API refused to return layer data for this screen.\\nDummy block inserted for code generation testing.",
+                    "rect": {"x": 50, "y": 100, "width": 600, "height": 200},
+                    "fills": [{"color": {"r": 255, "g": 200, "b": 200, "a": 1}}],
+                    "borders": [{"color": {"r": 255, "g": 0, "b": 0, "a": 1}, "thickness": 2}],
+                    "border_radius": 10,
+                    "texts": [{"style": {"font_size": 24, "color": {"r": 50, "g": 0, "b": 0, "a": 1}}}]
+                }]
             
         return {
             "screen": screen_data,
             "layers": layers,
         }
+
+    def _run_ocr_fallback(self, image_url):
+        """
+        Downloads the screen image into memory and uses EasyOCR to extract visual text blocks,
+        generating synthetic layer JSON payloads that the HTML converter can render.
+        """
+        layers = []
+        try:
+            import urllib.request
+            import numpy as np
+            import cv2
+            import easyocr
+            import ssl
+            
+            # Download image bypassing SSL in case of local cert issues
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.urlopen(image_url, context=ctx)
+            arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
+            img = cv2.imdecode(arr, -1)
+            
+            if img is None:
+                return []
+                
+            # Initialize reader (Downloads PyTorch models on first run if missing)
+            reader = easyocr.Reader(['en'])
+            results = reader.readtext(img)
+            
+            for (bbox, text, prob) in results:
+                if prob < 0.2:
+                    continue
+                x1, y1 = int(bbox[0][0]), int(bbox[0][1])
+                x2, y2 = int(bbox[2][0]), int(bbox[2][1])
+                w = max(1, x2 - x1)
+                h = max(1, y2 - y1)
+                
+                # Create a synthetic Zeplin text layer based on the OCR bounding box
+                layers.append({
+                    "type": "text",
+                    "name": f"OCR Text: {text[:10]}",
+                    "content": text,
+                    "rect": {"x": x1, "y": y1, "width": w, "height": h},
+                    "texts": [{"style": {"font_size": max(12, int(h * 0.7)), "color": {"r": 50, "g": 50, "b": 50, "a": 1}}}]
+                })
+        except Exception as e:
+            print(f"OCR Fallback Error: {e}")
+            
+        return layers
 
     def download_design_image(self, url, output_path):
         """

@@ -8,3 +8,6 @@ django-crispy-forms
 crispy-bootstrap5
 mysqlclient
 gunicorn==21.2.0
+pytesseract
+opencv-python
+numpy
