@@ -6,3 +6,4 @@ pixelmatch
 playwright
 django-crispy-forms
 crispy-bootstrap5
+mysqlclient
