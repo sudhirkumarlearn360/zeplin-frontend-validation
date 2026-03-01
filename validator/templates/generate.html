@@ -73,12 +73,27 @@
         const code = document.getElementById('generatedCodeArea').value;
         const blob = new Blob([code], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
+        
         const a = document.createElement('a');
+        a.style.display = 'none';
         a.href = url;
         a.download = `Zeplin_Code_{{ screen_id }}_${new Date().toISOString().slice(0,10)}.html`;
+        a.target = '_blank';
         document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+        
+        // Dispatch mouse event to ensure rigorous download trigger across all browsers
+        const clickEvent = new MouseEvent('click', {
+            view: window,
+            bubbles: true,
+            cancelable: false
+        });
+        a.dispatchEvent(clickEvent);
+        
+        // Cleanup
+        setTimeout(() => { 
+            document.body.removeChild(a); 
+            URL.revokeObjectURL(url); 
+        }, 100);
     }
 </script>
 {% endblock %}

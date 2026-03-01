@@ -435,11 +435,21 @@ async function previewAndDownloadHTML() {
 function triggerStandaloneDownload() {
     const blob = new Blob([standaloneHtmlString], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
+    
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = `Validation_Report_{{ report.id }}_${new Date().toISOString().slice(0,10)}.html`;
+    a.target = '_blank';
     document.body.appendChild(a);
-    a.click();
+    
+    const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: false
+    });
+    a.dispatchEvent(clickEvent);
+    
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
 </script>
