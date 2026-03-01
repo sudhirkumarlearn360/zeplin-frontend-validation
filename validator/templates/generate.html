@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <!-- Form Panel -->
+    <div class="col-{% if success %}4{% else %}8{% endif %}">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-dark text-white fw-bold">
+                🛠️ Zeplin Design to Code Converter
+            </div>
+            <div class="card-body bg-light">
+                <p class="text-muted mb-4">
+                    Enter a Zeplin Project and Screen ID. The engine will download all layers, colors, and fonts, and attempt to compile them into a raw HTML/CSS DOM tree.
+                </p>
+                
+                {% if error %}
+                <div class="alert alert-danger shadow-sm">
+                    <strong>Error:</strong> {{ error }}
+                </div>
+                {% endif %}
+                
+                <form method="POST" id="generateForm">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold shadow-sm" id="btnSubmit">
+                            🚀 Generate HTML Code
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results Panel -->
+    {% if success %}
+    <div class="col-8">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center fw-bold">
+                <span>✅ Code Generation Successful</span>
+                <button class="btn btn-sm btn-light fw-bold" onclick="downloadGeneratedHTML()">
+                    💾 Download .html
+                </button>
+            </div>
+            <div class="card-body p-0" style="position: relative;">
+                <textarea id="generatedCodeArea" class="form-control font-monospace border-0 h-100" style="font-size: 13px; min-height: 600px; resize: none;" readonly>{{ generated_html }}</textarea>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Loading Overlay -->
+<div class="loader-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; color: white;">
+    <div class="spinner-border text-primary" role="status" style="width: 4rem; height: 4rem; border-width: 0.4em;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <h3 class="mt-4 fw-bold">Compiling Zeplin Layers...</h3>
+    <p class="text-muted" id="loadingText">Fetching API data and building DOM tree (approx 5s)</p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('generateForm')?.addEventListener('submit', function() {
+        document.querySelector('.loader-overlay').style.display = 'flex';
+        document.getElementById('btnSubmit').disabled = true;
+    });
+    
+    function downloadGeneratedHTML() {
+        const code = document.getElementById('generatedCodeArea').value;
+        const blob = new Blob([code], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Zeplin_Code_{{ screen_id }}_${new Date().toISOString().slice(0,10)}.html`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    }
+</script>
+{% endblock %}

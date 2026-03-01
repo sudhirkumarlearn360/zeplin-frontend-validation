@@ -5,8 +5,9 @@ from django.conf import settings
 from django.core.files import File
 
 from .models import ValidationReport
-from .forms import ValidationForm
+from .forms import ValidationForm, GenerateCodeForm
 from .services.zeplin_service import ZeplinService
+from .services.zeplin_to_html_service import ZeplinToHtmlService
 from .services.screenshot_service import ScreenshotService
 from .services.comparison_service import ComparisonService
 from .services.css_validation_service import CSSValidationService
@@ -212,3 +213,33 @@ class LocateAllDefectsView(DetailView):
                 
         context['defects_with_coords'] = defects_with_coords
         return context
+
+class GenerateCodeView(FormView):
+    template_name = 'generate.html'
+    form_class = GenerateCodeForm
+    
+    def form_valid(self, form):
+        token = form.cleaned_data.get('zeplin_token')
+        project_id = form.cleaned_data['zeplin_project_id']
+        screen_id = form.cleaned_data['zeplin_screen_id']
+        
+        try:
+            z_service = ZeplinService(token=token if token else None)
+            zeplin_data = z_service.fetch_screen_data(project_id, screen_id)
+            
+            html_service = ZeplinToHtmlService()
+            generated_html = html_service.generate_html_css(zeplin_data.get('screen'), zeplin_data.get('layers'))
+            
+            return self.render_to_response(self.get_context_data(
+                form=form, 
+                generated_html=generated_html,
+                project_id=project_id,
+                screen_id=screen_id,
+                success=True
+            ))
+            
+        except Exception as e:
+            return self.render_to_response(self.get_context_data(
+                form=form,
+                error=str(e)
+            ))

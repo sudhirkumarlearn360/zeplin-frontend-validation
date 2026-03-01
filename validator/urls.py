@@ -9,4 +9,5 @@ urlpatterns = [
     path('report/<int:pk>/locate/<int:idx>/', views.LocateDefectView.as_view(), name='locate'),
     path('report/<int:pk>/locate_all/', views.LocateAllDefectsView.as_view(), name='locate_all'),
     path('reports/', views.ReportListView.as_view(), name='list'),
+    path('generate/', views.GenerateCodeView.as_view(), name='generate'),
 ]
