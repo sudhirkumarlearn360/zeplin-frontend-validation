@@ -39,9 +39,14 @@
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center fw-bold">
                 <span>✅ Code Generation Successful</span>
-                <button class="btn btn-sm btn-light fw-bold" onclick="downloadGeneratedHTML()">
-                    💾 Download .html
-                </button>
+                <div>
+                    <button class="btn btn-sm btn-info text-white fw-bold me-2" onclick="previewGeneratedHTML()">
+                        👁️ Preview HTML
+                    </button>
+                    <button class="btn btn-sm btn-light fw-bold" onclick="downloadGeneratedHTML()">
+                        💾 Download .html
+                    </button>
+                </div>
             </div>
             <div class="card-body p-0" style="position: relative;">
                 <textarea id="generatedCodeArea" class="form-control font-monospace border-0 h-100" style="font-size: 13px; min-height: 600px; resize: none;" readonly>{{ generated_html }}</textarea>
@@ -94,6 +99,13 @@
             document.body.removeChild(a); 
             URL.revokeObjectURL(url); 
         }, 100);
+    }
+    
+    function previewGeneratedHTML() {
+        const code = document.getElementById('generatedCodeArea').value;
+        const previewWindow = window.open('', '_blank');
+        previewWindow.document.write(code);
+        previewWindow.document.close();
     }
 </script>
 {% endblock %}
