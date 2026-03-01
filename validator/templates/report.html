@@ -18,7 +18,7 @@
                 💾 Export Report
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow">
-                <li><button class="dropdown-item py-2" onclick="downloadHTML()">🌐 Download as Standalone HTML</button></li>
+                <li><button id="btnPreviewHtml" class="dropdown-item py-2" onclick="previewAndDownloadHTML()">🌐 Preview & Download Standalone HTML</button></li>
                 <li><button class="dropdown-item py-2" onclick="downloadPDF()">📄 Download as PDF</button></li>
             </ul>
         </div>
@@ -297,6 +297,7 @@
         These coordinates map to the exact location on the Live Page representing contiguous blocks of differing pixels. Use these coordinates to pinpoint CSS misalignments or missing elements.
     </div>
 </div>
+</div>
 {% endif %}
 
 <div class="card shadow-sm mb-5">
@@ -310,6 +311,27 @@
         </div>
     </div>
 </div>
+
+<!-- Code Preview Modal -->
+<div class="modal fade" id="codePreviewModal" tabindex="-1" aria-labelledby="codePreviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="codePreviewModalLabel">Standalone HTML Source Code</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light">
+          <p class="text-muted small mb-2">This is the fully self-contained HTML file. All CSS, JavaScript, and Images have been converted to inline strings and Base64 data.</p>
+          <textarea id="codePreviewArea" class="form-control font-monospace" style="font-size: 12px; height: 500px;" readonly></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary fw-bold" onclick="triggerStandaloneDownload()"><i class="bi bi-download"></i> Save HTML File</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -331,83 +353,94 @@ function downloadPDF() {
     document.title = originalTitle;
 }
 
-function downloadHTML() {
-    // Clone the entire document
+let standaloneHtmlString = "";
+
+async function generateStandaloneHTML() {
     const clone = document.documentElement.cloneNode(true);
     
-    // Hide 'no-print' elements from the clone (like buttons to avoid confusion)
-    const noPrintElems = clone.querySelectorAll('.no-print');
-    noPrintElems.forEach(el => el.remove());
+    // Hide 'no-print' elements from the clone (like validation buttons)
+    clone.querySelectorAll('.no-print').forEach(el => el.remove());
+    // Remove the modal from the clone so it doesn't take up space in the saved file
+    const modalEl = clone.querySelector('#codePreviewModal');
+    if (modalEl) modalEl.remove();
     
-    // Expand all collapses
-    const collapses = clone.querySelectorAll('.collapse');
-    collapses.forEach(el => el.classList.add('show'));
-    
-    // Convert absolute/relative image URLs to base64 or just let them stay absolute if deployed.
-    // Since we want a self-contained look, but base64 is heavy, we'll just inject absolute base URI for local testing
-    // or let it use the current domain.
-    
-    // Resolve relative URLs to absolute so the standalone file works locally
-    const baseUri = window.location.origin;
-    
-    // Convert img src to absolute
-    clone.querySelectorAll('img').forEach(img => {
-        if (img.src && typeof img.src === 'string' && img.src.startsWith('/')) {
-            img.src = baseUri + img.src;
-        } else {
-            // Force browser to evaluate the absolute URL of the property
-            img.src = img.src; 
-        }
-    });
+    // Expand collapses
+    clone.querySelectorAll('.collapse').forEach(el => el.classList.add('show'));
 
-    // Convert link href (CSS) to absolute
-    clone.querySelectorAll('link').forEach(link => {
-        if (link.href && typeof link.href === 'string' && link.href.startsWith('/')) {
-            link.href = baseUri + link.href;
-        } else {
-            link.href = link.href;
-        }
-    });
-    
-    // Convert script src to absolute
-    clone.querySelectorAll('script').forEach(script => {
-        if (script.src && typeof script.src === 'string' && script.src.startsWith('/')) {
-            script.src = baseUri + script.src;
-        } else if (script.src) {
-            script.src = script.src;
-        }
-    });
-    
-    // Inject a base tag just in case
-    const head = clone.querySelector('head');
-    if (head) {
-        const base = document.createElement('base');
-        base.href = baseUri + '/';
-        head.insertBefore(base, head.firstChild);
+    // 1. Inline Images via Base64
+    const imgs = clone.querySelectorAll('img');
+    for (const img of imgs) {
+        if (!img.src || img.src.startsWith('data:')) continue;
+        try {
+            const resp = await fetch(img.src);
+            const blob = await resp.blob();
+            const reader = new FileReader();
+            await new Promise(r => {
+                reader.onloadend = r;
+                reader.readAsDataURL(blob);
+            });
+            img.src = reader.result;
+        } catch(e) { console.error("Could not inline image", img.src, e); }
     }
     
-    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
+    // 2. Inline CSS
+    const links = clone.querySelectorAll('link[rel="stylesheet"]');
+    for (const link of links) {
+        if (!link.href) continue;
+        try {
+            const resp = await fetch(link.href);
+            const cssText = await resp.text();
+            const style = document.createElement('style');
+            style.textContent = cssText;
+            link.replaceWith(style);
+        } catch(e) { console.error("Could not inline CSS", link.href, e); }
+    }
     
+    // 3. Inline JS
+    const scripts = clone.querySelectorAll('script[src]');
+    for (const script of scripts) {
+        if (!script.src) continue;
+        try {
+            const resp = await fetch(script.src);
+            const jsText = await resp.text();
+            const inlineScript = document.createElement('script');
+            inlineScript.textContent = jsText;
+            script.replaceWith(inlineScript);
+        } catch(e) { console.error("Could not inline JS", script.src, e); }
+    }
+    
+    return '<!DOCTYPE html>\n' + clone.outerHTML;
+}
+
+async function previewAndDownloadHTML() {
+    const btn = document.getElementById('btnPreviewHtml');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Extracting Assets...';
+    btn.disabled = true;
+    
+    try {
+        standaloneHtmlString = await generateStandaloneHTML();
+        
+        document.getElementById('codePreviewArea').value = standaloneHtmlString;
+        const modal = new bootstrap.Modal(document.getElementById('codePreviewModal'));
+        modal.show();
+    } catch (e) {
+        alert("Failed to generate standalone HTML: " + e);
+    }
+    
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+}
+
+function triggerStandaloneDownload() {
+    const blob = new Blob([standaloneHtmlString], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `Validation_Report_{{ report.id }}_${new Date().toISOString().slice(0,10)}.html`;
     document.body.appendChild(a);
-    
-    // Create and dispatch a clean click event
-    const clickEvent = new MouseEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: false
-    });
-    a.dispatchEvent(clickEvent);
-    
-    // Cleanup
-    setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
 </script>
 {% endblock %}
